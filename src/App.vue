@@ -3,12 +3,12 @@
     <header>
       <h1>資産管理システム <span class="user-name">plan0213 様</span></h1>
     </header>
-    
+
     <main>
       <section class="dashboard">
         <div class="section-header">
           <h2>保有資産一覧</h2>
-          <button @click="fetchAssets" :disabled="loading" class="refresh-btn">
+          <button @click="fetchAllData" :disabled="loading" class="refresh-btn">
             {{ loading ? '更新中...' : 'データを更新' }}
           </button>
         </div>
@@ -16,29 +16,55 @@
         <div v-if="loading" class="status-msg">
           データを読み込んでいます...
         </div>
-        
-        <table v-else class="asset-table">
-          <thead>
-            <tr>
-              <th>資産名</th>
-              <th>カテゴリー</th>
-              <th>残高</th>
-              <th>通貨</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="asset in assets" :key="asset.id">
-              <td class="font-bold">{{ asset.name }}</td>
-              <td>
-                <span :class="['badge', asset.type.toLowerCase()]">
-                  {{ translateType(asset.type) }}
-                </span>
-              </td>
-              <td class="amount">{{ formatNumber(asset.balance) }}</td>
-              <td>{{ asset.currency }}</td>
-            </tr>
-          </tbody>
-        </table>
+
+        <template v-else>
+          <table class="asset-table">
+            <thead>
+              <tr>
+                <th>資産名</th>
+                <th>カテゴリー</th>
+                <th>残高</th>
+                <th>通貨</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="asset in assets" :key="asset.id">
+                <td class="font-bold">{{ asset.name }}</td>
+                <td>
+                  <span :class="['badge', asset.type.toLowerCase()]">
+                    {{ translateType(asset.type) }}
+                  </span>
+                </td>
+                <td class="amount">{{ formatNumber(asset.balance) }}</td>
+                <td>{{ asset.currency }}</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <section class="transactions-section" style="margin-top: 40px;">
+            <h2>最近の取引履歴</h2>
+            <table class="transaction-table">
+              <thead>
+                <tr>
+                  <th>日付</th>
+                  <th>カテゴリー</th>
+                  <th>備考</th>
+                  <th class="text-right">金額</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="tx in transactions" :key="tx.id">
+                  <td>{{ formatDate(tx.transaction_date) }}</td>
+                  <td><span class="category-tag">{{ tx.category }}</span></td>
+                  <td class="note-cell">{{ tx.note }}</td>
+                  <td :class="['amount', tx.amount >= 0 ? 'income' : 'expense']">
+                    {{ tx.amount >= 0 ? '+' : '' }}{{ formatNumber(tx.amount) }}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </section>
+        </template>
 
         <div v-if="!loading && assets.length === 0" class="status-msg">
           表示できる資産データがありません。
@@ -51,9 +77,12 @@
 <script setup>
 import { ref, onMounted } from 'vue';
 
+// 响应式数据
 const assets = ref([]);
+const transactions = ref([]);
 const loading = ref(true);
 
+// 辅助函数：翻译类型
 const translateType = (type) => {
   const types = {
     'Cash': '現金',
@@ -65,62 +94,74 @@ const translateType = (type) => {
   return types[type] || type;
 };
 
+// 辅助函数：格式化数字
 const formatNumber = (num) => {
   return new Intl.NumberFormat('ja-JP').format(num);
 };
 
-const fetchAssets = async () => {
+// 辅助函数：格式化日期（处理数据库返回的ISO字符串）
+const formatDate = (dateStr) => {
+  if (!dateStr) return '';
+  return new Date(dateStr).toLocaleDateString('ja-JP');
+};
+
+// 核心功能：获取所有数据
+const fetchAllData = async () => {
   loading.value = true;
   try {
-    const response = await fetch('http://localhost:3000/api/assets');
-    const result = await response.json();
-    assets.value = result.data;
+    console.log('正在尝试连接后端...');
+    
+    // 并行请求资产和交易记录
+    const [assetRes, transRes] = await Promise.all([
+      fetch('http://localhost:3000/api/assets'),
+      fetch('http://localhost:3000/api/assets/transactions')
+    ]);
+
+    const assetResult = await assetRes.json();
+    const transResult = await transRes.json();
+
+    if (assetResult.success) {
+      assets.value = assetResult.data;
+    }
+    if (transResult.success) {
+      transactions.value = transResult.data;
+    }
+    
+    console.log('✅ 数据加载成功');
   } catch (error) {
-    console.error('データ取得失敗:', error);
-    alert('サーバーに接続できませんでした。');
+    console.error('❌ 数据取得失败:', error);
+    alert('サーバーに接続できませんでした。3000端口后端是否启动？');
   } finally {
     loading.value = false;
   }
 };
 
+// 组件挂载时自动加载数据
 onMounted(() => {
-  fetchAssets();
+  fetchAllData();
 });
 </script>
 
 <style scoped>
+/* 保持你原有的样式，增加一些必要的修饰 */
 .container {
   max-width: 900px;
   margin: 0 auto;
   padding: 40px 20px;
-  font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+  font-family: sans-serif;
   color: #2c3e50;
 }
 
 header {
   border-bottom: 2px solid #42b883;
   margin-bottom: 30px;
-  padding-bottom: 10px;
 }
 
 h1 {
   color: #42b883;
-  font-size: 1.8rem;
   display: flex;
   justify-content: space-between;
   align-items: center;
-}
-
-.user-name {
-  font-size: 1rem;
-  color: #666;
-}
-
-.section-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
 }
 
 .refresh-btn {
@@ -130,57 +171,38 @@ h1 {
   padding: 8px 16px;
   border-radius: 4px;
   cursor: pointer;
-  transition: opacity 0.2s;
 }
 
-.refresh-btn:hover {
-  opacity: 0.8;
-}
-
-.asset-table {
+.asset-table, .transaction-table {
   width: 100%;
   border-collapse: collapse;
-  background: white;
+  margin-bottom: 20px;
   box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-  border-radius: 8px;
-  overflow: hidden;
 }
 
-.asset-table th {
-  background-color: #f8f9fa;
-  padding: 15px;
+.asset-table th, .transaction-table th {
+  background: #f8f9fa;
+  padding: 12px;
   text-align: left;
-  border-bottom: 2px solid #eee;
 }
 
-.asset-table td {
-  padding: 15px;
+.asset-table td, .transaction-table td {
+  padding: 12px;
   border-bottom: 1px solid #eee;
 }
 
-.font-bold {
-  font-weight: bold;
-}
-
 .amount {
-  font-family: 'Courier New', Courier, monospace;
   text-align: right;
-  font-weight: bold;
+  font-family: monospace;
 }
 
-.badge {
-  padding: 4px 8px;
-  border-radius: 12px;
-  font-size: 0.8rem;
+.income { color: #2ecc71; }
+.expense { color: #e74c3c; }
+
+.category-tag {
   background: #eee;
-}
-
-.badge.bank { background: #e3f2fd; color: #1976d2; }
-.badge.cash { background: #e8f5e9; color: #388e3c; }
-
-.status-msg {
-  text-align: center;
-  padding: 40px;
-  color: #999;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.9em;
 }
 </style>
