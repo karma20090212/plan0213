@@ -10,11 +10,9 @@ router.get('/', async (req, res) => {
         const data = await AssetService.getAllAssets();
         res.json({ success: true, data });
     } catch (error: any) {
-        // 💡 把 message 改成具体的 error 信息，刷新浏览器直接看提示
         res.status(500).json({ 
             success: false, 
-            message: error.message || "未知错误",
-            stack: error.stack // 调试用，上线后记得删掉
+            message: "サーバーエラーが発生しました"
         });
     }
 });

@@ -77,12 +77,10 @@
 <script setup>
 import { ref, onMounted } from 'vue';
 
-// 响应式数据
 const assets = ref([]);
 const transactions = ref([]);
 const loading = ref(true);
 
-// 辅助函数：翻译类型
 const translateType = (type) => {
   const types = {
     'Cash': '現金',
@@ -94,27 +92,22 @@ const translateType = (type) => {
   return types[type] || type;
 };
 
-// 辅助函数：格式化数字
 const formatNumber = (num) => {
   return new Intl.NumberFormat('ja-JP').format(num);
 };
 
-// 辅助函数：格式化日期（处理数据库返回的ISO字符串）
 const formatDate = (dateStr) => {
   if (!dateStr) return '';
   return new Date(dateStr).toLocaleDateString('ja-JP');
 };
 
-// 核心功能：获取所有数据
 const fetchAllData = async () => {
   loading.value = true;
   try {
-    console.log('正在尝试连接后端...');
     
-    // 并行请求资产和交易记录
     const [assetRes, transRes] = await Promise.all([
-      fetch('http://localhost:3000/api/assets'),
-      fetch('http://localhost:3000/api/assets/transactions')
+      fetch(`${import.meta.env.VITE_API_URL}/api/assets`),
+      fetch(`${import.meta.env.VITE_API_URL}/api/assets/transactions`)
     ]);
 
     const assetResult = await assetRes.json();
@@ -127,23 +120,21 @@ const fetchAllData = async () => {
       transactions.value = transResult.data;
     }
     
-    console.log('✅ 数据加载成功');
+    console.log('✅ Data loaded successfully.');
   } catch (error) {
-    console.error('❌ 数据取得失败:', error);
-    alert('サーバーに接続できませんでした。3000端口后端是否启动？');
+    console.error('❌ Failed to retrieve data:', error);
+    alert('サーバーに接続できませんでした。');
   } finally {
     loading.value = false;
   }
 };
 
-// 组件挂载时自动加载数据
 onMounted(() => {
   fetchAllData();
 });
 </script>
 
 <style scoped>
-/* 保持你原有的样式，增加一些必要的修饰 */
 .container {
   max-width: 900px;
   margin: 0 auto;
